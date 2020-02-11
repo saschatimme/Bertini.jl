@@ -6,10 +6,9 @@ import HomotopyContinuation2
 const HC2 = HomotopyContinuation2
 using DelimitedFiles
 
-function read_solution_file(filename)
+function read_solution_file(filename, nvars)
     A = readdlm(filename)
     n = A[1, 1]
-    nvars = size(A, 2)
     map(2:nvars:size(A, 1)) do i
         map(i:i+nvars-1) do k
             A[k, 1] + im * A[k, 2]
@@ -62,9 +61,9 @@ function bertini(
     parameters = f.parameters,
     file_path = mktempdir(),
     start_parameters = isempty(parameters) ? nothing :
-                       UndefKeywordError(:start_parameters),
+                       throw(UndefKeywordError(:start_parameters)),
     final_parameters = isempty(parameters) ? nothing :
-                       UndefKeywordError(:final_parameters),
+                       throw(UndefKeywordError(:final_parameters)),
     bertini_path = "",
     TrackType = 0,
     optionalconfig...,
@@ -85,6 +84,7 @@ function bertini(
 
     push!(input, "INPUT")
 
+    nvars = sum(length, variable_groups)
     for vars in variable_groups
         vargroup = hom_variable_group ? "hom_variable_group " :
                    "variable_group "
@@ -123,7 +123,7 @@ function bertini(
 
     @time run(`bertini input`)
 
-    finite_solutions = read_solution_file("finite_solutions")
+    finite_solutions = read_solution_file("finite_solutions", nvars)
     runtime = open(joinpath(file_path, "output")) do f
         while true
             x = readline(f)
