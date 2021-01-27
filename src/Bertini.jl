@@ -2,41 +2,13 @@ module Bertini
 
 export bertini
 
-import HomotopyContinuation2
-const HC2 = HomotopyContinuation2
+import HomotopyContinuation
+const HC = HomotopyContinuation
 using DelimitedFiles
-
-function read_solution_file(filename, nvars)
-    A = readdlm(filename)
-    n = A[1, 1]
-    map(2:nvars:size(A, 1)) do i
-        map(i:i+nvars-1) do k
-            A[k, 1] + im * A[k, 2]
-        end
-    end
-end
-
-function write_solution_file(filename, S::Vector{<:Vector{<:Number}})
-    open(filename, "w") do f
-        write(f, "$(length(S))\n")
-        for s in S
-            write(f, "\n")
-            writedlm(f, [real.(s) imag.(s)], ' ')
-        end
-    end
-end
-
-function write_parameters_file(filename, p::Vector{<:Number})
-    open(filename, "w") do f
-        write(f, "$(length(p))\n\n")
-        writedlm(f, [real.(p) imag.(p)], ' ')
-    end
-end
-
 
 """
     bertini(
-        f::HC2.ModelKit.System,
+        f,
         S = nothing;
         hom_variable_group = false,
         variable_groups = [f.variables],
@@ -54,7 +26,7 @@ end
 Run bertini.
 """
 function bertini(
-    f::HC2.ModelKit.System,
+    f::HC.System,
     S = nothing;
     hom_variable_group = false,
     variable_groups = [f.variables],
@@ -103,19 +75,20 @@ function bertini(
         push!(input, "f$i = $(fi);")
     end
     push!(input, "END")
-
+    # replace complex numbers
+    input = map(line -> replace(line, r"(^|\W)(im)(\W|$)" => s"\1I\3"), input)
     writedlm("input", input, '\n')
 
     if !isempty(parameters)
         if S === nothing
             throw(ArgumentError("start solutions not given."))
         end
-        write_solution_file(joinpath(file_path, "start"), S)
-        write_parameters_file(
+        HC.write_solutions(joinpath(file_path, "start"), S)
+        HC.write_parameters(
             joinpath(file_path, "start_parameters"),
             start_parameters,
         )
-        write_parameters_file(
+        HC.write_parameters(
             joinpath(file_path, "final_parameters"),
             final_parameters,
         )
@@ -123,7 +96,7 @@ function bertini(
 
     @time run(`bertini input`)
 
-    finite_solutions = read_solution_file("finite_solutions", nvars)
+    finite_solutions = HC.read_solutions("finite_solutions")
     runtime = open(joinpath(file_path, "output")) do f
         while true
             x = readline(f)
